@@ -1,0 +1,78 @@
+#include <Wire.h>
+#include "MAX30105.h"
+
+//#define MAX30102_I2C_ADDRESS 0x57
+
+MAX30105 particleSensor;
+
+const int IR_THRESHOLD = 5000; // Adjust this threshold value based on your setup
+
+void setup()
+{
+  Serial.begin(115200);
+  Serial.println("Initializing...");
+
+  if(!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
+  {
+    Serial.println("MAX30102 was not found. Please check wiring/power.");
+    while (1);
+  }
+
+  Serial.println("Place your index finger on the sensor with steady pressure.");
+
+  particleSensor.setup(); // Configure sensor with default settings
+  //particleSensor.setup(0x02, 0x1F, 4, 4096);  // Sample rate, sensitivity, LED brightness, ADC range
+  particleSensor.setPulseAmplitudeRed(0x0A);  // Red LED current
+  //particleSensor.setPulseAmplitudeIR(0x0A);   // IR LED current
+}
+
+void loop()
+{
+  // Read sensor data
+  long irValue = particleSensor.getIR();
+  long redValue = particleSensor.getRed();
+  Serial.print("IR=");
+  Serial.print(irValue);
+
+  
+
+  // Check if a finger is detected
+  if (isFingerDetected(irValue))
+  {
+    // Calculate SpO2
+    float spo2 = calculateSpO2(irValue, redValue);
+
+    // Print result
+    if(spo2<500)
+    {
+      Serial.print("SpO2: ");
+      Serial.print(spo2);
+      Serial.println(" %");
+    }
+  }
+  else
+  {
+    Serial.println("0");
+  }
+
+  delay(1000);
+}
+
+bool isFingerDetected(int32_t irValue)
+{
+  // Determine if a finger is detected based on the IR value threshold
+  return irValue > IR_THRESHOLD;
+}
+
+float calculateSpO2(int32_t irValue, int32_t redValue)
+{
+  // Calculate SpO2 using the IR and R values
+  float spo2 = 0.0;
+
+  if (redValue > 0)
+  {
+    spo2 = 100.0 * (irValue / static_cast<float>(redValue));
+  }
+
+  return spo2;
+}
